@@ -10,7 +10,6 @@ import time
 
 from depth_anything_v2.dpt import DepthAnythingV2
 
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Depth Anything V2')
     
@@ -20,6 +19,7 @@ if __name__ == '__main__':
     
     parser.add_argument('--encoder', type=str, default='vitl', choices=['vits', 'vitb', 'vitl', 'vitg'])
     parser.add_argument('--grayscale', dest='grayscale', action='store_true', help="Output depth images in grayscale")
+    parser.add_argument('--extension', type=str, default='', help="Extension to append to the checkpoint file path")
     
     args = parser.parse_args()
     
@@ -34,9 +34,8 @@ if __name__ == '__main__':
     
     depth_anything = DepthAnythingV2(**model_configs[args.encoder])
 
-    # CHANGE PATH HERE
-    depth_anything.load_state_dict(torch.load(f'checkpoints/depth_anything_v2_{args.encoder}.pth', map_location='cpu'))
-    # CHANGE PATH HERE
+    checkpoint_path = f'checkpoints/depth_anything_v2_{args.encoder}_{args.extension}.pth'
+    depth_anything.load_state_dict(torch.load(checkpoint_path, map_location='cpu'))
 
     depth_anything = depth_anything.to(DEVICE).eval()
     

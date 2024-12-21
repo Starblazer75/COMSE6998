@@ -1,10 +1,11 @@
+import argparse
 import json
 import numpy as np
 from PIL import Image
 from tqdm import tqdm 
 
 def get_depth_at_points(depth_image_path, point):
-    depth_image = np.array(Image.open(depth_image_path), dtype=np.int32) 
+    depth_image = np.array(Image.open(depth_image_path), dtype=np.int32)
     try:
         return depth_image[point[0], point[1]][0]
     except IndexError:
@@ -50,8 +51,16 @@ def evaluate_accuracy(annotations_file, image_directory, image_extension='.png')
     accuracy = (correct / (total // 2)) * 100 if total > 0 else 0
     return accuracy
 
-annotations_file = "DA-2K/annotations.json"
-image_directory = "fine_weights"  
-image_extension = ".png"  
-accuracy = evaluate_accuracy(annotations_file, image_directory, image_extension)
-print(f"Accuracy: {accuracy:.2f}%")
+def main():
+    parser = argparse.ArgumentParser(description="Evaluate depth prediction accuracy using annotations.")
+    parser.add_argument('--annotations', type=str, required=True, help="Path to the annotations JSON file.")
+    parser.add_argument('--image-dir', type=str, required=True, help="Directory containing depth images.")
+    args = parser.parse_args()
+
+    print(f"Evaluating accuracy with annotations file: {args.annotations}")
+    print(f"Using images from directory: {args.image_dir}")
+    accuracy = evaluate_accuracy(args.annotations, args.image_dir, '.png')
+    print(f"Accuracy: {accuracy:.2f}%")
+
+if __name__ == "__main__":
+    main()

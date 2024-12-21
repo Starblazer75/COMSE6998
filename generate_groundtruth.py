@@ -44,7 +44,7 @@ if __name__ == '__main__':
     parser.add_argument('--img-path', type=str, required=True, help="Path to input image directory")
     parser.add_argument('--input-size', type=int, default=518, help="Input size for the model")
     parser.add_argument('--outdir', type=str, default='./output', help="Base output directory")
-    
+    parser.add_argument('--extension', type=str, default='', help="Extension to append to the checkpoint file path")
     parser.add_argument('--encoder', type=str, default='vitl', choices=['vits', 'vitb', 'vitl', 'vitg'])
     args = parser.parse_args()
     
@@ -59,9 +59,7 @@ if __name__ == '__main__':
     
     depth_anything = DepthAnythingV2(**model_configs[args.encoder])
 
-    # CHANGE PATH HERE
-    depth_anything.load_state_dict(torch.load(f'checkpoints/depth_anything_v2_{args.encoder}.pth', map_location='cpu'))
-    # CHANGE PATH HERE
+    depth_anything.load_state_dict(torch.load(f'checkpoints/depth_anything_v2_{args.encoder}_{args.extension}.pth', map_location='cpu'))
 
     depth_anything = depth_anything.to(DEVICE).eval()
     

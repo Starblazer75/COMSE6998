@@ -35,14 +35,11 @@ if __name__ == '__main__':
     parser.add_argument('--input-size', type=int, default=518, help="Input size for the model")
     parser.add_argument('--outdir', type=str, default='./vis_depth', help="Base output directory")
     parser.add_argument('--grayscale', dest='grayscale', action='store_true', help="Output depth images in grayscale")
+    parser.add_argument('--onnx-model-path', type=str, required=True, help="Path to the ONNX model file")
     
     args = parser.parse_args()
-    
-    # CHANGE PATH HERE
-    onnx_model_path = '../Depth-Anything-V2/checkpoints/depth_anything_v2_vits.quant.onnx'
-    # CHANGE PATH HERE
 
-    session = ort.InferenceSession(onnx_model_path, providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
+    session = ort.InferenceSession(args.onnx_model_path, providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
     
     input_name = session.get_inputs()[0].name
     output_name = session.get_outputs()[0].name
