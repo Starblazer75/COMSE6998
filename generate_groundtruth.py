@@ -24,12 +24,10 @@ class DepthDataset(Dataset):
     def __getitem__(self, idx):
         entry = self.metadata[idx]
         
-        # Load image
         img_path = os.path.join(self.img_dir, entry['image'])
         image = cv2.imread(img_path)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         
-        # Load depth map
         depth_path = os.path.join(self.depth_dir, entry['depth'])
         depth = np.load(depth_path)
         
@@ -60,7 +58,11 @@ if __name__ == '__main__':
     }
     
     depth_anything = DepthAnythingV2(**model_configs[args.encoder])
+
+    # CHANGE PATH HERE
     depth_anything.load_state_dict(torch.load(f'checkpoints/depth_anything_v2_{args.encoder}.pth', map_location='cpu'))
+    # CHANGE PATH HERE
+
     depth_anything = depth_anything.to(DEVICE).eval()
     
     if not os.path.isdir(args.img_path):
@@ -72,7 +74,7 @@ if __name__ == '__main__':
         if not os.path.isdir(subset_dir):
             raise ValueError(f"Missing required subset directory: {subset}")
         
-        filenames = glob.glob(os.path.join(subset_dir, '*/*'))  # Adjust to handle class directories
+        filenames = glob.glob(os.path.join(subset_dir, '*/*')) 
         subset_outdir = os.path.join(args.outdir, subset)
         os.makedirs(os.path.join(subset_outdir, "depth_maps"), exist_ok=True)
         
@@ -81,14 +83,11 @@ if __name__ == '__main__':
         for k, filename in enumerate(filenames):
             print(f'Processing {subset} {k+1}/{len(filenames)}: {filename}')
             
-            # Load image
             raw_image = cv2.imread(filename)
             
-            # Inference
             depth = depth_anything.infer_image(raw_image, args.input_size)
             depth_normalized = (depth - depth.min()) / (depth.max() - depth.min())
             
-            # Preserve subdirectory structure
             relative_path = os.path.relpath(filename, subset_dir)
             depth_output_path = os.path.join(subset_outdir, "depth_maps", relative_path)
             depth_output_dir = os.path.dirname(depth_output_path)
@@ -98,14 +97,12 @@ if __name__ == '__main__':
             depth_file_path = os.path.join(depth_output_dir, depth_filename)
             np.save(depth_file_path, depth_normalized)
             
-            # Save metadata entry
             metadata_entry = {
                 "image": relative_path,
                 "depth": os.path.relpath(depth_file_path, subset_outdir)
             }
             output_metadata.append(metadata_entry)
         
-        # Save metadata JSON
         metadata_path = os.path.join(subset_outdir, "metadata.json")
         with open(metadata_path, "w") as f:
             json.dump(output_metadata, f, indent=4)

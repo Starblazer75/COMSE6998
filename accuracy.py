@@ -44,8 +44,6 @@ def evaluate_accuracy(annotations_file, image_directory, image_extension='.png')
             else:
                 expected_closer_point = 'point2'
 
-            #print(f'Closer: {closer_point}, Expected: {expected_closer_point}, Depth1: {depth1}, Depth2: {depth2}, Image: {image_path}')
-
             if closer_point == expected_closer_point:
                 correct += 1
 

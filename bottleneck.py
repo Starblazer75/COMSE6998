@@ -50,7 +50,7 @@ if __name__ == '__main__':
         record_shapes=True,
         with_stack=True
     ) as prof:
-        for k, filename in enumerate(filenames[:10]):  # Limit to first 10 files for profiling
+        for k, filename in enumerate(filenames[:10]): 
             print(f'Processing {k+1}/{len(filenames)}: {filename}')
             
             raw_image = cv2.imread(filename)

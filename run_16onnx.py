@@ -5,41 +5,47 @@ import matplotlib
 import matplotlib.cm
 import numpy as np
 import os
-import torch
+import onnxruntime as ort
 import time
 
-from depth_anything_v2.dpt import DepthAnythingV2
+def resize_image(image, target_size=518):
+    """Resizes the image to the target size."""
+    return cv2.resize(image, (target_size, target_size))
+
+def image2tensor(image, target_size=518):
+    """Converts the image to the tensor format expected by the model."""
+    original_shape = image.shape[:2]
+    image_resized = resize_image(image, target_size)
+    image_resized = image_resized.astype(np.float32) / 255.0 
+    image_resized = np.transpose(image_resized, (2, 0, 1))
+    image_resized = np.expand_dims(image_resized, axis=0)  
+    
+    image_resized = image_resized.astype(np.float16)
+    
+    return image_resized, original_shape
+
+def resize_depth_map(depth_map, original_shape):
+    """Resizes the depth map back to the original image size."""
+    return cv2.resize(depth_map, (original_shape[1], original_shape[0]))  
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Depth Anything V2')
+    parser = argparse.ArgumentParser(description='Depth Anything V2 with ONNX')
     
     parser.add_argument('--img-path', type=str, required=True, help="Path to input image directory")
     parser.add_argument('--input-size', type=int, default=518, help="Input size for the model")
     parser.add_argument('--outdir', type=str, default='./vis_depth', help="Base output directory")
-    
-    parser.add_argument('--encoder', type=str, default='vitl', choices=['vits', 'vitb', 'vitl', 'vitg'])
     parser.add_argument('--grayscale', dest='grayscale', action='store_true', help="Output depth images in grayscale")
     
     args = parser.parse_args()
     
-    DEVICE = 'cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu'
+    # CHANGE PATH HERE
+    onnx_model_path = '../Depth-Anything-V2/checkpoints/depth_anything_v2_vits.quant.onnx'
+    # CHANGE PATH HERE
 
-    model_configs = {
-        'vits': {'encoder': 'vits', 'features': 64, 'out_channels': [48, 96, 192, 384]},
-        'vitb': {'encoder': 'vitb', 'features': 128, 'out_channels': [96, 192, 384, 768]},
-        'vitl': {'encoder': 'vitl', 'features': 256, 'out_channels': [256, 512, 1024, 1024]},
-        'vitg': {'encoder': 'vitg', 'features': 384, 'out_channels': [1536, 1536, 1536, 1536]}
-    }
+    session = ort.InferenceSession(onnx_model_path, providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
     
-    # Initialize DepthAnythingV2 model with the correct encoder
-    depth_anything = DepthAnythingV2(**model_configs[args.encoder])
-
-    # Load the saved weights (ensure the correct path to your saved model weights)
-    checkpoint_path = 'depth_anything_v2_16bit_finetuned.pth'  # Path to your saved model weights
-    depth_anything.load_state_dict(torch.load(checkpoint_path, map_location='cpu'))
-    
-    # Move model to the correct device (GPU or CPU)
-    depth_anything = depth_anything.to(DEVICE).eval()
+    input_name = session.get_inputs()[0].name
+    output_name = session.get_outputs()[0].name
     
     if os.path.isfile(args.img_path):
         raise ValueError("The input path must be a directory containing subdirectories with images.")
@@ -62,19 +68,27 @@ if __name__ == '__main__':
         
         load_start_time = time.time()
         raw_image = cv2.imread(filename)
+        if raw_image is None:
+            print(f"Error loading image: {filename}")
+            continue
+        
+        raw_image_resized, original_shape = image2tensor(raw_image, target_size=args.input_size)
         load_end_time = time.time()
-
+        
         inference_start_time = time.time()
-        depth = depth_anything.infer_image(raw_image, args.input_size)
+        depth = session.run([output_name], {input_name: raw_image_resized})[0]
         inference_end_time = time.time()
         
+        depth = depth.squeeze()  
         depth = (depth - depth.min()) / (depth.max() - depth.min()) * 255.0
         depth = depth.astype(np.uint8)
         
+        depth_resized = resize_depth_map(depth, original_shape)
+        
         if args.grayscale:
-            depth = np.repeat(depth[..., np.newaxis], 3, axis=-1)
+            depth_resized = np.repeat(depth_resized[..., np.newaxis], 3, axis=-1)
         else:
-            depth = (cmap(depth)[:, :, :3] * 255)[:, :, ::-1].astype(np.uint8)
+            depth_resized = (cmap(depth_resized)[:, :, :3] * 255)[:, :, ::-1].astype(np.uint8)
         
         relative_path = os.path.relpath(filename, args.img_path)
         output_path = os.path.join(args.outdir, relative_path)
@@ -83,7 +97,7 @@ if __name__ == '__main__':
         os.makedirs(output_dir, exist_ok=True)
         
         output_filename = os.path.splitext(os.path.basename(filename))[0] + '.png'
-        cv2.imwrite(os.path.join(output_dir, output_filename), depth)
+        cv2.imwrite(os.path.join(output_dir, output_filename), depth_resized)
         
         total_end_time = time.time()
         if k >= warmup_threshold:
